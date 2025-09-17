@@ -1,5 +1,9 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { initializeAuth, getReactNativePersistence } from "firebase/auth";
+import { 
+  getAuth, 
+  initializeAuth, 
+  getReactNativePersistence 
+} from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getFirestore } from "firebase/firestore";
 
@@ -13,13 +17,22 @@ const firebaseConfig = {
   appId: "1:408699981802:web:7c9232959815a709a0ec93"
 };
 
-// Evitar duplicados
+// 1. Inicializar la App de Firebase (Evita duplicados)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Inicializar Auth con persistencia
-export const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage),
-});
+// 2. Inicializar Auth con persistencia (Evita el error 'already-initialized')
+let auth;
+try {
+  // Intenta obtener la instancia existente
+  auth = getAuth(app);
+} catch (e) {
+  // Si no existe, inicialízala
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage),
+  });
+}
 
+// Exportamos las constantes
+export { auth };
 export const db = getFirestore(app);
 export default app;

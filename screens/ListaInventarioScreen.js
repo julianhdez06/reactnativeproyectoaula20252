@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { View, Text, FlatList, TextInput, TouchableOpacity, Image, StyleSheet, Alert } from "react-native";
+import { View, Text, FlatList, TextInput, TouchableOpacity, Image, StyleSheet, Alert, ActivityIndicator } from "react-native";
 import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { useFocusEffect } from "@react-navigation/native";
@@ -23,28 +23,49 @@ export default function ListaInventarioScreen({ navigation }) {
   }, []);
 
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       cargarProductos();
     }, [cargarProductos])
   );
 
   const eliminarProducto = async (id) => {
-    Alert.alert("Confirmar", "¿Deseas eliminar este producto?", [
+    Alert.alert("Confirmar Eliminación", "¿Estás seguro de que deseas eliminar este producto?", [
       { text: "Cancelar", style: "cancel" },
-      { text: "Eliminar", style: "destructive", onPress: async () => {
-        try {
-          await deleteDoc(doc(db, "productos", id));
-          cargarProductos();
-        } catch (error) {
-          Alert.alert("Error", error.message);
+      { 
+        text: "Eliminar", 
+        style: "destructive", 
+        onPress: async () => {
+          try {
+            // 🚨 OPTIMIZACIÓN: Elimina el producto del estado local (instantáneo)
+            setProductos(currentProductos => currentProductos.filter(p => p.id !== id));
+            
+            // Ejecuta la eliminación en la base de datos
+            await deleteDoc(doc(db, "productos", id));
+            
+            Alert.alert("Éxito", "Producto eliminado con éxito."); 
+            
+          } catch (error) {
+            // Si Firebase falla, recargamos la lista para que el producto regrese
+            Alert.alert("Error", "No se pudo eliminar el producto. La lista se ha actualizado.");
+            cargarProductos(); 
+          }
         }
-      }}
+      }
     ]);
   };
 
   const logout = async () => {
-    try { await signOut(auth); } 
-    catch (error) { Alert.alert("Error", error.message); }
+    try { 
+      await signOut(auth); 
+      // Reiniciamos la navegación al Login
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
+    } 
+    catch (error) { 
+      Alert.alert("Error", error.message); 
+    }
   };
 
   const filtrarProductos = productos.filter(p =>
@@ -55,22 +76,24 @@ export default function ListaInventarioScreen({ navigation }) {
   const renderItem = ({ item }) => (
     <View style={styles.productoContainer}>
       <Image
+        // Asegúrate de que esta ruta sea válida o maneja el caso nulo.
         source={item.foto ? { uri: item.foto } : require('../assets/no-image.png')}
         style={styles.imagen}
       />
       <View style={styles.info}>
         <Text style={styles.nombre}>{item.nombre}</Text>
-        <Text>Código: {item.codigo}</Text>
-        <Text>Cantidad: {item.cantidad}</Text>
+        <Text style={styles.detalle}>Código: {item.codigo}</Text>
+        <Text style={styles.cantidad}>Cantidad: {item.cantidad}</Text>
+        
         <View style={styles.botones}>
           <TouchableOpacity
-            style={[styles.button, { backgroundColor: "#2E86AB" }]}
+            style={[styles.buttonSmall, { backgroundColor: "#007AFF" }]}
             onPress={() => navigation.navigate("EditarProducto", { producto: item })}
           >
             <Text style={styles.buttonText}>Editar</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.button, { backgroundColor: "#E74C3C" }]}
+            style={[styles.buttonSmall, { backgroundColor: "#FF3B30" }]}
             onPress={() => eliminarProducto(item.id)}
           >
             <Text style={styles.buttonText}>Eliminar</Text>
@@ -83,46 +106,96 @@ export default function ListaInventarioScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        <TextInput
+          placeholder="Buscar por nombre o código"
+          style={styles.inputBusqueda}
+          value={busqueda}
+          onChangeText={setBusqueda}
+        />
         <TouchableOpacity style={styles.btnAgregar} onPress={() => navigation.navigate("AgregarProducto")}>
-          <Text style={styles.buttonText}>Agregar Producto</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.btnCerrar} onPress={logout}>
-          <Text style={styles.buttonText}>Cerrar Sesión</Text>
+          <Text style={styles.btnAgregarText}>+</Text>
         </TouchableOpacity>
       </View>
-
-      <TextInput
-        placeholder="Buscar por nombre o código"
-        style={styles.input}
-        value={busqueda}
-        onChangeText={setBusqueda}
-      />
-
+      
       {cargando ? (
-        <Text style={{ textAlign: "center", marginTop: 20 }}>Cargando...</Text>
+        <ActivityIndicator size="large" color="#007AFF" style={{ marginTop: 20 }} />
       ) : (
         <FlatList
           data={filtrarProductos}
           keyExtractor={item => item.id}
           renderItem={renderItem}
+          ListEmptyComponent={() => <Text style={styles.listaVacia}>No hay productos en el inventario.</Text>}
           contentContainerStyle={{ paddingBottom: 20 }}
         />
       )}
+      
+      <TouchableOpacity style={styles.btnCerrar} onPress={logout}>
+        <Text style={styles.buttonText}>Cerrar Sesión</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 10 },
-  header: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
-  btnAgregar: { flex: 1, backgroundColor: "#27AE60", padding: 10, borderRadius: 8, alignItems: "center", marginRight: 5 },
-  btnCerrar: { flex: 1, backgroundColor: "#E67E22", padding: 10, borderRadius: 8, alignItems: "center", marginLeft: 5 },
-  input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 10, marginBottom: 10 },
-  productoContainer: { flexDirection: "row", borderWidth: 1, borderColor: "#ccc", borderRadius: 8, marginVertical: 5, overflow: "hidden" },
-  imagen: { width: 100, height: 100 },
-  info: { flex: 1, padding: 10 },
-  nombre: { fontWeight: "bold", fontSize: 16, marginBottom: 5 },
-  botones: { flexDirection: "row", marginTop: 10, justifyContent: "space-between" },
-  button: { flex: 1, padding: 5, borderRadius: 5, alignItems: "center", marginHorizontal: 5 },
-  buttonText: { color: "#fff", fontWeight: "bold" },
+  container: { flex: 1, padding: 10, backgroundColor: '#F2F2F7' },
+  header: { flexDirection: "row", justifyContent: "space-between", marginBottom: 15 },
+  inputBusqueda: { 
+    flex: 1,
+    backgroundColor: '#fff', 
+    borderWidth: 1, 
+    borderColor: "#D1D1D6", 
+    padding: 12, 
+    borderRadius: 10, 
+    fontSize: 16,
+    marginRight: 10
+  },
+  btnAgregar: {
+    backgroundColor: "#34C759", // Verde para Agregar
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  btnAgregarText: { color: "#fff", fontWeight: "bold", fontSize: 24 },
+  btnCerrar: { 
+    backgroundColor: "#E67E22", 
+    padding: 12, 
+    borderRadius: 10, 
+    alignItems: "center", 
+    marginTop: 10 
+  },
+  
+  productoContainer: { 
+    flexDirection: "row", 
+    backgroundColor: 'white', 
+    borderRadius: 12, 
+    marginVertical: 8, 
+    padding: 10, 
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3, 
+  },
+  imagen: { 
+    width: 80, 
+    height: 80, 
+    borderRadius: 8,
+    marginRight: 15 
+  },
+  info: { flex: 1, justifyContent: 'center' },
+  nombre: { fontWeight: "bold", fontSize: 17, marginBottom: 4, color: '#333' },
+  detalle: { fontSize: 14, color: '#666' },
+  cantidad: { fontSize: 14, color: '#666', fontWeight: 'bold' },
+  botones: { flexDirection: "row", marginTop: 8 },
+  buttonSmall: { 
+    flex: 1, 
+    padding: 8, 
+    borderRadius: 8, 
+    alignItems: "center", 
+    marginRight: 10 
+  },
+  buttonText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
+  listaVacia: { textAlign: "center", marginTop: 50, fontSize: 16, color: '#666' },
 });
