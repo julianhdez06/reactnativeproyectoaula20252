@@ -1,7 +1,8 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { AuthProvider, useAuth } from './AuthContext'; // Ajusta la ruta
+import { AuthProvider, useAuth } from './AuthContext';
+import { OfflineProvider } from './OfflineContext'; // ⬅️ NUEVO
 // Importar tus pantallas
 import WelcomeScreen from './screens/WelcomeScreen';
 import LoginScreen from './screens/LoginScreen';
@@ -11,6 +12,9 @@ import DetailsScreen from './screens/DetailsScreen';
 import TreeScreen from './screens/TreeScreen';
 import AddPetScreen from './screens/AddPetScreen';
 import EditPetScreen from './screens/EditPetScreen';
+// ⬇️ NUEVAS PANTALLAS
+import AppointmentScreen from './screens/AppointmentScreen';
+import SpecialistsScreen from './screens/SpecialistsScreen';
 
 const Stack = createStackNavigator();
 
@@ -52,7 +56,17 @@ function AppNavigator() {
               component={EditPetScreen}
               options={{ title: 'Editar Mascota' }}
             />
-
+            {/* ⬇️ NUEVAS PANTALLAS */}
+            <Stack.Screen
+              name="Appointments"
+              component={AppointmentScreen}
+              options={{ title: 'Agenda de Citas' }}
+            />
+            <Stack.Screen
+              name="Specialists"
+              component={SpecialistsScreen}
+              options={{ title: 'Especialistas' }}
+            />
           </>
         ) : (
           // Usuario no autenticado - mostrar pantallas de auth
@@ -82,7 +96,10 @@ function AppNavigator() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppNavigator />
+      {/* ⬇️ NUEVO PROVIDER PARA MODO OFFLINE */}
+      <OfflineProvider>
+        <AppNavigator />
+      </OfflineProvider>
     </AuthProvider>
   );
 }
