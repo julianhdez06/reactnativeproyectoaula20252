@@ -1,3 +1,4 @@
+// cambio mínimo para habilitar el Pull Request
 import React, { useState } from "react";
 import { View, TextInput, Button, StyleSheet, Alert, Text, TouchableOpacity, KeyboardAvoidingView, Platform } from "react-native";
 import { createUserWithEmailAndPassword } from "firebase/auth";
