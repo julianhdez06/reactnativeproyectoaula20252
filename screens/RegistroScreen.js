@@ -12,7 +12,7 @@ import {
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../firebaseConfig";
 import { LinearGradient } from "expo-linear-gradient";
-import HeaderApp from "../components/HeaderApp"; // ⬅ IMPORTANTE
+import HeaderApp from "../components/HeaderApp";
 
 export default function RegistroScreen({ navigation }) {
   const [email, setEmail] = useState("");
@@ -29,19 +29,15 @@ export default function RegistroScreen({ navigation }) {
     }
 
     try {
-      // 🔴 Registro en Firebase
       await createUserWithEmailAndPassword(auth, email, password);
-
-      // Cerrar sesión inmediatamente después del registro
       await auth.signOut();
 
       Alert.alert("Éxito", "Cuenta creada correctamente.", [
         {
           text: "OK",
-          onPress: () => navigation.navigate("Login"),  // Redirige al login
+          onPress: () => navigation.navigate("Login"),
         },
       ]);
-
     } catch (error) {
       console.log(error);
 
@@ -60,7 +56,6 @@ export default function RegistroScreen({ navigation }) {
 
   return (
     <View style={{ flex: 1 }}>
-      {/* 🔵 Header con el switch Online/Offline */}
       <HeaderApp />
 
       <KeyboardAvoidingView
@@ -103,9 +98,7 @@ export default function RegistroScreen({ navigation }) {
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => navigation.navigate("Login")}>
-            <Text style={styles.link}>
-              ¿Ya tienes cuenta? Inicia sesión
-            </Text>
+            <Text style={styles.link}>¿Ya tienes cuenta? Inicia sesión</Text>
           </TouchableOpacity>
         </LinearGradient>
       </KeyboardAvoidingView>

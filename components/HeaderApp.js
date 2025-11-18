@@ -1,4 +1,3 @@
-// components/HeaderApp.js
 import React from "react";
 import { View, Text, StyleSheet, Switch, TouchableOpacity } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";

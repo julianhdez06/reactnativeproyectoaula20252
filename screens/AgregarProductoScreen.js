@@ -12,7 +12,6 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useNavigation } from "@react-navigation/native";
-
 import { useAppContext } from "../context/AppContext";
 import HeaderApp from "../components/HeaderApp";
 import { LinearGradient } from "expo-linear-gradient";
@@ -28,7 +27,6 @@ export default function AgregarProductoScreen() {
   const [foto, setFoto] = useState(null);
   const [cargando, setCargando] = useState(false);
 
-  // 📸 Tomar o elegir foto
   const pickImage = async (useCamera) => {
     const perm = useCamera
       ? await ImagePicker.requestCameraPermissionsAsync()
@@ -40,17 +38,13 @@ export default function AgregarProductoScreen() {
     }
 
     const opts = { allowsEditing: true, quality: 0.7 };
-
     const result = useCamera
       ? await ImagePicker.launchCameraAsync(opts)
       : await ImagePicker.launchImageLibraryAsync(opts);
 
-    if (!result.canceled) {
-      setFoto(result.assets[0].uri); // 👈 URI temporal
-    }
+    if (!result.canceled) setFoto(result.assets[0].uri);
   };
 
-  // 💾 Guardar producto
   const guardar = async () => {
     if (!nombre || !codigo || !cantidad) {
       Alert.alert("Error", "Todos los campos son obligatorios.");
@@ -64,11 +58,10 @@ export default function AgregarProductoScreen() {
       codigo,
       cantidad: parseInt(cantidad, 10),
       stockMinimo: parseInt(stockMinimo, 10),
-      foto, // 👈 pasamos la URI temporal, el contexto la guarda persistente
+      foto,
     });
 
     setCargando(false);
-
     Alert.alert("Éxito", "Producto agregado correctamente.");
     navigation.goBack();
   };
@@ -76,7 +69,6 @@ export default function AgregarProductoScreen() {
   return (
     <View style={{ flex: 1 }}>
       <HeaderApp />
-
       <LinearGradient colors={["#ffffff", "#eef2ff"]} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.container}>
           <Text style={styles.titulo}>Agregar Producto</Text>
@@ -123,7 +115,6 @@ export default function AgregarProductoScreen() {
           />
 
           <Text style={styles.label}>Foto del Producto</Text>
-
           <View style={styles.buttonGroup}>
             <TouchableOpacity
               style={[styles.photoButton, { marginRight: 10 }]}
@@ -131,7 +122,6 @@ export default function AgregarProductoScreen() {
             >
               <Text style={styles.buttonText}>Galería</Text>
             </TouchableOpacity>
-
             <TouchableOpacity
               style={styles.photoButton}
               onPress={() => pickImage(true)}

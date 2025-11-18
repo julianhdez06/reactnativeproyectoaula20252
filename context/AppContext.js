@@ -31,7 +31,6 @@ export function AppProvider({ children }) {
         if (v) procesarColaPendiente();
     };
 
-    // ---------------- TOAST ----------------
     const [toastMsg, setToastMsg] = useState("");
     const [toastVisible, setToastVisible] = useState(false);
     const toastOpacity = useRef(new Animated.Value(0)).current;
@@ -69,37 +68,31 @@ export function AppProvider({ children }) {
         );
     };
 
-    // ---------------- KEYS ----------------
     const KEY_INV = "inventarioLocal";
     const KEY_MOV = "movimientos";
     const KEY_COLA = "colaPendientes";
 
     const guardarInventarioLocal = async (lista) => {
         setInventario(lista);
-        try { await AsyncStorage.setItem(KEY_INV, JSON.stringify(lista)); }
-        catch (e) { console.log("Error guardarInventarioLocal:", e); }
+        try { await AsyncStorage.setItem(KEY_INV, JSON.stringify(lista)); } catch {}
     };
 
     const guardarMovimientosLocal = async (lista) => {
         setMovimientos(lista);
-        try { await AsyncStorage.setItem(KEY_MOV, JSON.stringify(lista)); }
-        catch (e) { console.log("Error guardarMovimientosLocal:", e); }
+        try { await AsyncStorage.setItem(KEY_MOV, JSON.stringify(lista)); } catch {}
     };
 
     const guardarColaLocal = async (cola) => {
         setColaPendientes(cola);
-        try { await AsyncStorage.setItem(KEY_COLA, JSON.stringify(cola)); }
-        catch (e) { console.log("Error guardarColaLocal:", e); }
+        try { await AsyncStorage.setItem(KEY_COLA, JSON.stringify(cola)); } catch {}
     };
 
-    // ---------------- IMÁGENES ----------------
     const guardarFotoLocal = async (uri, fileName) => {
         try {
             const newPath = `${FileSystem.documentDirectory}${fileName}`;
             await FileSystem.copyAsync({ from: uri, to: newPath });
             return newPath;
-        } catch (error) {
-            console.log("Error guardarFotoLocal:", error);
+        } catch {
             return null;
         }
     };
@@ -108,16 +101,10 @@ export function AppProvider({ children }) {
         try {
             if (uri && uri.startsWith(FileSystem.documentDirectory)) {
                 await FileSystem.deleteAsync(uri, { idempotent: true });
-                console.log("Foto borrada:", uri);
-            } else {
-                console.log("No se puede borrar, ruta inválida:", uri);
             }
-        } catch (e) {
-            console.log("Error borrarFotoLocal:", e);
-        }
+        } catch {}
     };
 
-    // ---------------- INICIALIZACIÓN ----------------
     const normalizarInventario = (lista) =>
         (lista || []).map((p) => {
             if (p.foto && !p.foto.startsWith(FileSystem.documentDirectory)) {
@@ -160,7 +147,7 @@ export function AppProvider({ children }) {
             if (mov) setMovimientos(JSON.parse(mov));
             if (cola) setColaPendientes(JSON.parse(cola));
             if (online) await sincronizarDesdeFirestore();
-        } catch (e) { console.log("Error inicializarTodo:", e); }
+        } catch {}
         setCargandoInventario(false);
     };
 
@@ -177,7 +164,7 @@ export function AppProvider({ children }) {
                 };
             });
             await guardarInventarioLocal(normalizarInventario(lista));
-        } catch (e) { console.log("Error sincronizarDesdeFirestore:", e); }
+        } catch {}
     };
 
     const procesarColaPendiente = async () => {
@@ -190,31 +177,18 @@ export function AppProvider({ children }) {
                 else if (item.type === "producto_update") await updateDoc(doc(db, "productos", item.id), item.payload);
             }
             await guardarColaLocal([]);
-        } catch (e) { console.log("Error procesarColaPendiente:", e); }
+        } catch {}
     };
 
-    // ---------------- FUNCIONES CRUD ----------------
     const addProducto = async (producto) => {
         setCargando(true);
         try {
             const id = producto.codigo || Date.now().toString();
-
-            // Copiar foto al FileSystem (si viene una URI temporal)
-            const fotoPersistente = producto.foto
-                ? await guardarFotoLocal(producto.foto, id)
-                : null;
-
-            const productoFinal = {
-                ...producto,
-                id,
-                codigo: id,
-                foto: fotoPersistente, // ruta persistente o null
-            };
-
+            const fotoPersistente = producto.foto ? await guardarFotoLocal(producto.foto, id) : null;
+            const productoFinal = { ...producto, id, codigo: id, foto: fotoPersistente };
             const nuevoInv = [productoFinal, ...inventario];
             await guardarInventarioLocal(nuevoInv);
 
-            // Movimiento de entrada inicial
             const movimiento = {
                 id: Date.now().toString(),
                 tipo: "entrada",
@@ -231,15 +205,12 @@ export function AppProvider({ children }) {
             const nuevosMov = [movimiento, ...movimientos];
             await guardarMovimientosLocal(nuevosMov);
 
-            // En Firestore solo guardamos el nombre del archivo (no la ruta completa)
             const firestorePayload = {
                 nombre: productoFinal.nombre,
                 codigo: productoFinal.codigo,
                 cantidad: Number(productoFinal.cantidad) || 0,
                 stockMinimo: productoFinal.stockMinimo ?? 0,
-                foto: fotoPersistente
-                    ? fotoPersistente.replace(FileSystem.documentDirectory, "")
-                    : null,
+                foto: fotoPersistente ? fotoPersistente.replace(FileSystem.documentDirectory, "") : null,
             };
 
             if (online) {
@@ -256,12 +227,7 @@ export function AppProvider({ children }) {
 
             showToast("Entrada registrada");
             return productoFinal;
-        } catch (e) {
-            console.log("Error addProducto:", e);
-            throw e;
-        } finally {
-            setCargando(false);
-        }
+        } catch { throw e; } finally { setCargando(false); }
     };
 
     const editProducto = async (id, nuevosDatos) => {
@@ -275,35 +241,20 @@ export function AppProvider({ children }) {
             const diferencia = cantidadDespues - cantidadAntes;
             const tipo = diferencia >= 0 ? "entrada" : "salida";
 
-            // Manejo de foto
             let fotoPersistente = productoActual.foto || null;
             if (nuevosDatos.foto) {
                 const time = Date.now();
                 const fileName = `${id}_${time}.jpg`;
-
-                if (
-                    productoActual.foto &&
-                    productoActual.foto.startsWith(FileSystem.documentDirectory)
-                ) {
+                if (productoActual.foto && productoActual.foto.startsWith(FileSystem.documentDirectory)) {
                     await borrarFotoLocal(productoActual.foto);
                 }
-
                 fotoPersistente = await guardarFotoLocal(nuevosDatos.foto, fileName);
             }
 
-            const productoEditado = {
-                ...productoActual,
-                ...nuevosDatos,
-                cantidad: cantidadDespues,
-                foto: fotoPersistente,
-            };
-
-            const inventarioActualizado = inventario.map((p) =>
-                p.id === id ? productoEditado : p
-            );
+            const productoEditado = { ...productoActual, ...nuevosDatos, cantidad: cantidadDespues, foto: fotoPersistente };
+            const inventarioActualizado = inventario.map((p) => p.id === id ? productoEditado : p);
             await guardarInventarioLocal(inventarioActualizado);
 
-            // Registrar movimiento si cambió la cantidad
             if (diferencia !== 0) {
                 const movimiento = {
                     id: Date.now().toString(),
@@ -317,63 +268,43 @@ export function AppProvider({ children }) {
                     fecha: new Date().toISOString(),
                     detalles: { antes: cantidadAntes, despues: cantidadDespues },
                 };
-
                 const movimientosActualizados = [movimiento, ...movimientos];
                 await guardarMovimientosLocal(movimientosActualizados);
 
                 if (online) {
                     await addDoc(collection(db, "movimientos"), movimiento);
                 } else {
-                    const cola = [
-                        ...colaPendientes,
-                        { type: "movimiento_add", payload: movimiento },
-                    ];
+                    const cola = [...colaPendientes, { type: "movimiento_add", payload: movimiento }];
                     await guardarColaLocal(cola);
                 }
             }
 
-            // Actualizar en Firestore
             const payloadFirestore = {
                 nombre: productoEditado.nombre,
                 codigo: productoEditado.codigo,
                 cantidad: cantidadDespues,
                 stockMinimo: productoEditado.stockMinimo ?? 0,
-                foto: productoEditado.foto
-                    ? productoEditado.foto.replace(FileSystem.documentDirectory, "")
-                    : null,
+                foto: productoEditado.foto ? productoEditado.foto.replace(FileSystem.documentDirectory, "") : null,
             };
 
-            if (online) {
-                await updateDoc(doc(db, "productos", id), payloadFirestore);
-            } else {
-                const cola = [
-                    ...colaPendientes,
-                    { type: "producto_update", id, payload: payloadFirestore },
-                ];
+            if (online) await updateDoc(doc(db, "productos", id), payloadFirestore);
+            else {
+                const cola = [...colaPendientes, { type: "producto_update", id, payload: payloadFirestore }];
                 await guardarColaLocal(cola);
             }
 
             showToast("Producto actualizado correctamente");
             return true;
-        } catch (e) {
-            console.log("Error editProducto:", e);
-            throw e;
-        } finally {
-            setCargando(false);
-        }
+        } catch { throw e; } finally { setCargando(false); }
     };
-
-
 
     const deleteProducto = async (productoId) => {
         setCargando(true);
         try {
             const productoActual = inventario.find((p) => p.id === productoId);
             if (!productoActual) return;
-
             const { foto, nombre, cantidad } = productoActual;
 
-            // Borrar foto persistente si existe y es del sandbox
             if (foto && foto.startsWith(FileSystem.documentDirectory)) {
                 await borrarFotoLocal(foto);
             }
@@ -402,42 +333,24 @@ export function AppProvider({ children }) {
                 await deleteDoc(doc(db, "productos", productoId));
                 await addDoc(collection(db, "movimientos"), movimiento);
             } else {
-                const cola = [
-                    ...colaPendientes,
-                    { type: "producto_delete", id: productoId },
-                    { type: "movimiento_add", payload: movimiento },
-                ];
+                const cola = [...colaPendientes, { type: "producto_delete", id: productoId }, { type: "movimiento_add", payload: movimiento }];
                 await guardarColaLocal(cola);
             }
 
             showToast("Producto eliminado correctamente");
-        } catch (e) {
-            console.log("Error deleteProducto:", e);
-        } finally {
-            setCargando(false);
-        }
+        } catch {} finally { setCargando(false); }
     };
 
     const cerrarSesion = async () => {
-        console.log("Cerrando sesión...");
         try {
             await signOut(auth);
-
-            // Borra inventario y cola, pero conserva movimientos
             await AsyncStorage.removeItem(KEY_INV);
             await AsyncStorage.removeItem(KEY_COLA);
-
             setInventario([]);
             setColaPendientes([]);
-
-            
             showToast("Sesión cerrada");
-        } catch (e) {
-            console.log("Error cerrarSesion:", e);
-            showToast("Error al cerrar sesión");
-        }
+        } catch { showToast("Error al cerrar sesión"); }
     };
-
 
     return (
         <AppContext.Provider
@@ -456,7 +369,7 @@ export function AppProvider({ children }) {
                 editProducto,
                 deleteProducto,
                 cerrarSesion,
-                showToast, // 👈 expone showToast para usarlo en pantallas
+                showToast,
             }}
         >
             {children}

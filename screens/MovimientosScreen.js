@@ -12,7 +12,7 @@ import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAppContext } from "../context/AppContext";
-import HeaderApp from "../components/HeaderApp"; // 👈 importa tu header
+import HeaderApp from "../components/HeaderApp";
 
 export default function MovimientosScreen() {
   const { movimientos, online } = useAppContext();
@@ -23,7 +23,6 @@ export default function MovimientosScreen() {
   const [pickerFin, setPickerFin] = useState(false);
   const [filtrados, setFiltrados] = useState([]);
 
-  // FILTRO AUTOMÁTICO
   useEffect(() => {
     filtrarMovimientos();
   }, [movimientos, inicio, fin]);
@@ -35,7 +34,6 @@ export default function MovimientosScreen() {
     setFiltrados(data);
   };
 
-  // EXPORTAR PDF
   const generarPDF = async () => {
     if (filtrados.length === 0)
       return Alert.alert("Error", "No hay movimientos en el rango seleccionado");
@@ -88,7 +86,6 @@ export default function MovimientosScreen() {
     }
   };
 
-  // RENDER DE CADA TARJETA
   const renderItem = ({ item }) => {
     const cantidadMovimiento = item.detalles.despues - item.detalles.antes;
     const colorMovimiento =
@@ -123,10 +120,8 @@ export default function MovimientosScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header global reutilizable */}
       <HeaderApp title="Movimientos" />
 
-      {/* FILTRO DE FECHAS */}
       <Text style={styles.sectionTitle}>Filtrar por fecha</Text>
 
       <View style={styles.dateRow}>
@@ -145,7 +140,6 @@ export default function MovimientosScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* PICKERS */}
       <DateTimePickerModal
         isVisible={pickerInicio}
         mode="date"
@@ -166,7 +160,6 @@ export default function MovimientosScreen() {
         onCancel={() => setPickerFin(false)}
       />
 
-      {/* PDF */}
       <TouchableOpacity style={styles.pdfBtn} onPress={generarPDF}>
         <Text style={styles.pdfText}>Exportar PDF</Text>
       </TouchableOpacity>
@@ -184,8 +177,6 @@ export default function MovimientosScreen() {
     </View>
   );
 }
-
-// ---------------- ESTILOS ----------------
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F2F2F7" },

@@ -1,4 +1,3 @@
-// EditarProductoScreen.js
 import React, { useState } from "react";
 import {
   View,
@@ -13,33 +12,26 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useNavigation, useRoute } from "@react-navigation/native";
-
 import { useAppContext } from "../context/AppContext";
 import HeaderApp from "../components/HeaderApp";
 import { LinearGradient } from "expo-linear-gradient";
 import Toast from "react-native-toast-message";
-import * as FileSystem from "expo-file-system/legacy"; // 👈 Importa legacy
+import * as FileSystem from "expo-file-system/legacy";
 
 export default function EditarProductoScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const { producto } = route.params;
-
   const { editProducto, deleteProducto, online, showToast } = useAppContext();
 
-  // Campos
   const [nombre, setNombre] = useState(producto?.nombre ?? "");
   const [codigo, setCodigo] = useState(producto?.codigo ?? "");
   const [cantidad, setCantidad] = useState(String(producto?.cantidad ?? ""));
-  const [stockMinimo, setStockMinimo] = useState(
-    String(producto?.stockMinimo ?? "0")
-  );
-
+  const [stockMinimo, setStockMinimo] = useState(String(producto?.stockMinimo ?? "0"));
   const [nuevaFotoUri, setNuevaFotoUri] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
 
-  // 📸 Seleccionar foto
   const pickImage = async (useCamera) => {
     try {
       const perm = useCamera
@@ -61,10 +53,9 @@ export default function EditarProductoScreen() {
         : await ImagePicker.launchImageLibraryAsync(opts);
 
       if (!result.canceled && result.assets?.length > 0) {
-        setNuevaFotoUri(result.assets[0].uri); // 👈 URI temporal
+        setNuevaFotoUri(result.assets[0].uri);
       }
     } catch (e) {
-      console.log("pickImage error:", e);
       Toast.show({
         type: "error",
         text1: "Error",
@@ -73,7 +64,6 @@ export default function EditarProductoScreen() {
     }
   };
 
-  // 💾 Guardar cambios
   const guardarCambios = async () => {
     if (!nombre || !codigo || !cantidad || stockMinimo === "") {
       Toast.show({
@@ -87,18 +77,14 @@ export default function EditarProductoScreen() {
     setCargando(true);
 
     try {
-      const nuevaCantidad = Number(cantidad);
       const dataToUpdate = {
         nombre,
         codigo,
-        cantidad: nuevaCantidad,
+        cantidad: Number(cantidad),
         stockMinimo: Number(stockMinimo),
       };
 
-      // Solo enviamos foto si hay nueva
-      if (nuevaFotoUri) {
-        dataToUpdate.foto = nuevaFotoUri; // 👈 URI temporal, el contexto la guarda persistente
-      }
+      if (nuevaFotoUri) dataToUpdate.foto = nuevaFotoUri;
 
       await editProducto(producto.id, dataToUpdate);
 
@@ -109,8 +95,7 @@ export default function EditarProductoScreen() {
       });
 
       navigation.goBack();
-    } catch (e) {
-      console.log("guardarCambios error:", e);
+    } catch {
       Toast.show({
         type: "error",
         text1: "Error",
@@ -121,24 +106,20 @@ export default function EditarProductoScreen() {
     }
   };
 
-  // ❌ Eliminar producto
   const confirmarEliminar = async () => {
     setModalVisible(false);
     setCargando(true);
-
     try {
       await deleteProducto(producto.id);
       showToast("Producto eliminado con éxito");
       navigation.goBack();
-    } catch (e) {
-      console.log("Error eliminar:", e);
+    } catch {
       showToast("Error al eliminar");
     } finally {
       setCargando(false);
     }
   };
 
-  // 📷 Mostrar foto (persistente o nueva)
   const uriMostrar = nuevaFotoUri
     ? nuevaFotoUri
     : producto?.foto
@@ -150,7 +131,6 @@ export default function EditarProductoScreen() {
   return (
     <View style={{ flex: 1 }}>
       <HeaderApp />
-
       <LinearGradient colors={["#ffffff", "#eef2ff"]} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.container}>
           <TouchableOpacity
@@ -185,7 +165,6 @@ export default function EditarProductoScreen() {
           />
 
           <Text style={styles.label}>Foto del Producto</Text>
-
           <View style={styles.buttonGroup}>
             <TouchableOpacity
               style={[styles.photoButton, { marginRight: 10 }]}
@@ -230,15 +209,11 @@ export default function EditarProductoScreen() {
         </ScrollView>
       </LinearGradient>
 
-      {/* Modal eliminar */}
       <Modal transparent visible={modalVisible} animationType="fade">
         <View style={styles.modalFondo}>
           <View style={styles.modalCaja}>
             <Text style={styles.modalTitulo}>¿Eliminar producto?</Text>
-            <Text style={styles.modalTexto}>
-              Esta acción no se puede deshacer.
-            </Text>
-
+            <Text style={styles.modalTexto}>Esta acción no se puede deshacer.</Text>
             <View style={styles.modalBotones}>
               <TouchableOpacity
                 style={styles.modalCancelar}
@@ -246,7 +221,6 @@ export default function EditarProductoScreen() {
               >
                 <Text style={styles.modalCancelarTexto}>Cancelar</Text>
               </TouchableOpacity>
-
               <TouchableOpacity
                 style={styles.modalEliminar}
                 onPress={confirmarEliminar}
@@ -261,126 +235,28 @@ export default function EditarProductoScreen() {
   );
 }
 
-//
-// Estilos
-//
 const styles = StyleSheet.create({
   container: { padding: 20, paddingBottom: 80 },
-
-  titulo: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#1a1a1a",
-    marginBottom: 20,
-    textAlign: "center",
-  },
-
-  deleteButton: {
-    alignSelf: "flex-end",
-    padding: 8,
-    marginBottom: 10,
-  },
+  titulo: { fontSize: 22, fontWeight: "700", color: "#1a1a1a", marginBottom: 20, textAlign: "center" },
+  deleteButton: { alignSelf: "flex-end", padding: 8, marginBottom: 10 },
   deleteText: { fontSize: 26, color: "red" },
-
   label: { fontSize: 16, marginBottom: 8, color: "#333", fontWeight: "500" },
-
-  input: {
-    backgroundColor: "#fff",
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 15,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: "#D1D1D6",
-  },
-
+  input: { backgroundColor: "#fff", padding: 15, borderRadius: 12, marginBottom: 15, fontSize: 16, borderWidth: 1, borderColor: "#D1D1D6" },
   buttonGroup: { flexDirection: "row", marginBottom: 20 },
-
-  photoButton: {
-    flex: 1,
-    backgroundColor: "#4C6EF5",
-    padding: 14,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-
+  photoButton: { flex: 1, backgroundColor: "#4C6EF5", padding: 14, borderRadius: 12, alignItems: "center" },
   buttonText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-
-  imagen: {
-    width: 170,
-    height: 170,
-    marginBottom: 25,
-    alignSelf: "center",
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: "#c7d2fe",
-  },
-
-  imagenPlaceholder: {
-    backgroundColor: "#f2f3f7",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  botonGuardar: {
-    backgroundColor: "#34C759",
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: "center",
-    marginTop: 10,
-  },
-
+  imagen: { width: 170, height: 170, marginBottom: 25, alignSelf: "center", borderRadius: 14, borderWidth: 2, borderColor: "#c7d2fe" },
+  imagenPlaceholder: { backgroundColor: "#f2f3f7", alignItems: "center", justifyContent: "center" },
+  botonGuardar: { backgroundColor: "#34C759", paddingVertical: 16, borderRadius: 12, alignItems: "center", marginTop: 10 },
   textoGuardar: { color: "#fff", fontWeight: "700", fontSize: 17 },
-
-  offlineMsg: {
-    marginTop: 18,
-    textAlign: "center",
-    color: "#FF9500",
-    fontWeight: "600",
-  },
-
-  modalFondo: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  modalCaja: {
-    backgroundColor: "#fff",
-    width: "80%",
-    padding: 20,
-    borderRadius: 15,
-    alignItems: "center",
-  },
-
+  offlineMsg: { marginTop: 18, textAlign: "center", color: "#FF9500", fontWeight: "600" },
+  modalFondo: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", alignItems: "center" },
+  modalCaja: { backgroundColor: "#fff", width: "80%", padding: 20, borderRadius: 15, alignItems: "center" },
   modalTitulo: { fontSize: 20, fontWeight: "700", marginBottom: 10 },
-
   modalTexto: { fontSize: 15, color: "#444", textAlign: "center" },
-
-  modalBotones: {
-    flexDirection: "row",
-    marginTop: 20,
-    width: "100%",
-    justifyContent: "space-between",
-  },
-
-  modalCancelar: {
-    flex: 1,
-    backgroundColor: "#ccc",
-    padding: 12,
-    borderRadius: 10,
-    marginRight: 10,
-  },
-
+  modalBotones: { flexDirection: "row", marginTop: 20, width: "100%", justifyContent: "space-between" },
+  modalCancelar: { flex: 1, backgroundColor: "#ccc", padding: 12, borderRadius: 10, marginRight: 10 },
   modalCancelarTexto: { textAlign: "center", fontWeight: "600" },
-
-  modalEliminar: {
-    flex: 1,
-    backgroundColor: "red",
-    padding: 12,
-    borderRadius: 10,
-  },
-
+  modalEliminar: { flex: 1, backgroundColor: "red", padding: 12, borderRadius: 10 },
   modalEliminarTexto: { textAlign: "center", color: "#fff", fontWeight: "700" },
 });

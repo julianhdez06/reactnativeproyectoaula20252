@@ -18,7 +18,7 @@ import HeaderApp from "../components/HeaderApp";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import Toast from "react-native-toast-message";
-import * as FileSystem from "expo-file-system/legacy"; // 👈 Importa legacy
+import * as FileSystem from "expo-file-system/legacy";
 
 export default function ListaInventarioScreen() {
   const navigation = useNavigation();
@@ -29,9 +29,6 @@ export default function ListaInventarioScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
 
-  // -------------------------
-  // Eliminar producto con toast
-  // -------------------------
   const eliminarProducto = async () => {
     if (!productoSeleccionado) return;
 
@@ -63,9 +60,6 @@ export default function ListaInventarioScreen() {
     setModalVisible(true);
   };
 
-  // -------------------------
-  // BUSQUEDA
-  // -------------------------
   useEffect(() => {
     filtrar(busqueda);
   }, [busqueda, inventario]);
@@ -86,9 +80,6 @@ export default function ListaInventarioScreen() {
     setListaFiltrada(filtro);
   };
 
-  // -------------------------
-  // EXPORTAR PDF
-  // -------------------------
   const exportarInventarioPDF = async () => {
     if (!inventario.length) {
       Toast.show({
@@ -144,11 +135,7 @@ export default function ListaInventarioScreen() {
     }
   };
 
-  // -------------------------
-  // RENDER ITEM
-  // -------------------------
   const renderItem = ({ item }) => {
-    // reconstruir ruta si la foto viene de Firestore (solo nombre)
     const fotoUri = item?.foto
       ? item.foto.startsWith(FileSystem.documentDirectory)
         ? item.foto
@@ -156,19 +143,18 @@ export default function ListaInventarioScreen() {
       : null;
 
     return (
-  <View style={styles.card}>
-    {fotoUri ? (
-      <Image
-        source={{ uri: fotoUri }}
-        style={styles.imagen}
-        key={fotoUri}   // 👈 fuerza re-render cuando cambia la ruta
-      />
-    ) : (
-      <View style={styles.imagenPlaceholder}>
-        <Text style={{ color: "#999" }}>Sin foto</Text>
-      </View>
-    )}
-
+      <View style={styles.card}>
+        {fotoUri ? (
+          <Image
+            source={{ uri: fotoUri }}
+            style={styles.imagen}
+            key={fotoUri}
+          />
+        ) : (
+          <View style={styles.imagenPlaceholder}>
+            <Text style={{ color: "#999" }}>Sin foto</Text>
+          </View>
+        )}
 
         <View style={styles.info}>
           <Text style={styles.nombre}>{item?.nombre}</Text>
@@ -222,7 +208,6 @@ export default function ListaInventarioScreen() {
           onChangeText={setBusqueda}
         />
 
-        {/* Botón Exportar PDF */}
         <TouchableOpacity style={styles.pdfBtn} onPress={exportarInventarioPDF}>
           <Ionicons name="document-text-outline" size={20} color="#fff" />
           <Text style={styles.pdfTexto}>Exportar Inventario PDF</Text>
@@ -232,9 +217,8 @@ export default function ListaInventarioScreen() {
           data={listaFiltrada}
           keyExtractor={(item) => item?.id?.toString()}
           renderItem={renderItem}
-          extraData={listaFiltrada} // 👈 asegura actualización
+          extraData={listaFiltrada}
         />
-
 
         <TouchableOpacity
           style={styles.fab}
@@ -243,7 +227,6 @@ export default function ListaInventarioScreen() {
           <Text style={styles.fabText}>+</Text>
         </TouchableOpacity>
 
-        {/* MODAL */}
         <Modal transparent visible={modalVisible} animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={styles.modalContainer}>
@@ -281,8 +264,6 @@ export default function ListaInventarioScreen() {
   );
 }
 
-// Estilos
-//
 const styles = StyleSheet.create({
   background: {
     flex: 1,
