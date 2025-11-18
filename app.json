@@ -1,7 +1,12 @@
 {
   "expo": {
+<<<<<<< HEAD
     "name": "proyecto-inventarioapp",
     "slug": "proyecto-inventarioapp",
+=======
+    "name": "VetApp",
+    "slug": "VetApp",
+>>>>>>> profesor/main
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -24,9 +29,13 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+<<<<<<< HEAD
     },
     "plugins": [
       "expo-sqlite"
     ]
+=======
+    }
+>>>>>>> profesor/main
   }
 }
