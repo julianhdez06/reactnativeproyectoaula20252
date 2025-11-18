@@ -1,123 +1,386 @@
+// EditarProductoScreen.js
 import React, { useState } from "react";
-import { View, TextInput, Button, StyleSheet, Alert, Image, TouchableOpacity, ScrollView, Text, ActivityIndicator } from "react-native";
-import { doc, updateDoc } from "firebase/firestore";
+import {
+  View,
+  TextInput,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+  ScrollView,
+  Text,
+  ActivityIndicator,
+  Modal,
+} from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { db } from "../firebaseConfig";
+import { useNavigation, useRoute } from "@react-navigation/native";
 
-export default function EditarProductoScreen({ route, navigation }) {
+import { useAppContext } from "../context/AppContext";
+import HeaderApp from "../components/HeaderApp";
+import { LinearGradient } from "expo-linear-gradient";
+import Toast from "react-native-toast-message";
+import * as FileSystem from "expo-file-system/legacy"; // 👈 Importa legacy
+
+export default function EditarProductoScreen() {
+  const navigation = useNavigation();
+  const route = useRoute();
   const { producto } = route.params;
-  const [nombre, setNombre] = useState(producto.nombre);
-  const [codigo, setCodigo] = useState(producto.codigo);
-  const [cantidad, setCantidad] = useState(producto.cantidad.toString());
-  const [foto, setFoto] = useState(producto.foto || null);
-  const [cargando, setCargando] = useState(false);
 
-  const handleSelectPicture = async (useCamera) => {
-    const permissionResult = useCamera 
+  const { editProducto, deleteProducto, online, showToast } = useAppContext();
+
+  // Campos
+  const [nombre, setNombre] = useState(producto?.nombre ?? "");
+  const [codigo, setCodigo] = useState(producto?.codigo ?? "");
+  const [cantidad, setCantidad] = useState(String(producto?.cantidad ?? ""));
+  const [stockMinimo, setStockMinimo] = useState(
+    String(producto?.stockMinimo ?? "0")
+  );
+
+  const [nuevaFotoUri, setNuevaFotoUri] = useState(null);
+  const [cargando, setCargando] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+
+  // 📸 Seleccionar foto
+  const pickImage = async (useCamera) => {
+    try {
+      const perm = useCamera
         ? await ImagePicker.requestCameraPermissionsAsync()
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    if (permissionResult.granted === false) {
-      Alert.alert("Permiso Denegado", "Necesitas conceder permiso para acceder a la galería o la cámara.");
+      if (!perm.granted) {
+        Toast.show({
+          type: "error",
+          text1: "Permiso denegado",
+          text2: "No puedes acceder a la cámara o galería.",
+        });
+        return;
+      }
+
+      const opts = { allowsEditing: true, quality: 0.7 };
+      const result = useCamera
+        ? await ImagePicker.launchCameraAsync(opts)
+        : await ImagePicker.launchImageLibraryAsync(opts);
+
+      if (!result.canceled && result.assets?.length > 0) {
+        setNuevaFotoUri(result.assets[0].uri); // 👈 URI temporal
+      }
+    } catch (e) {
+      console.log("pickImage error:", e);
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: "No se pudo seleccionar la imagen.",
+      });
+    }
+  };
+
+  // 💾 Guardar cambios
+  const guardarCambios = async () => {
+    if (!nombre || !codigo || !cantidad || stockMinimo === "") {
+      Toast.show({
+        type: "error",
+        text1: "Campos incompletos",
+        text2: "Todos los campos son obligatorios.",
+      });
       return;
     }
-    
-    const pickerOptions = {
-      base64: true,
-      quality: 0.3,
-      allowsEditing: true,
-    };
-    
-    let result;
-    if (useCamera) {
-      result = await ImagePicker.launchCameraAsync(pickerOptions);
-    } else {
-      result = await ImagePicker.launchImageLibraryAsync(pickerOptions);
-    }
-
-    if (!result.canceled && result.assets.length > 0) {
-      setFoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
-    }
-  };
-
-
-  const guardarCambios = async () => {
-    if (!nombre || !codigo || !cantidad) {
-      return Alert.alert("Error", "Todos los campos (Nombre, Código, Cantidad) son obligatorios.");
-    }
-    
-    // 🚨 PASO 1: NAVEGACIÓN INSTANTÁNEA
-    navigation.goBack(); 
 
     setCargando(true);
-    
+
     try {
-      const docRef = doc(db, "productos", producto.id);
-      
-      // PASO 2: Ejecutar la operación de Firebase en segundo plano (sin await)
-      updateDoc(docRef, {
+      const nuevaCantidad = Number(cantidad);
+      const dataToUpdate = {
         nombre,
         codigo,
-        cantidad: parseInt(cantidad, 10),
-        foto
-      })
-      .catch((error) => console.error("Error al actualizar producto en background:", error));
+        cantidad: nuevaCantidad,
+        stockMinimo: Number(stockMinimo),
+      };
 
-    } catch (error) {
-      // El error solo se mostraría si la operación falla antes de la navegación.
+      // Solo enviamos foto si hay nueva
+      if (nuevaFotoUri) {
+        dataToUpdate.foto = nuevaFotoUri; // 👈 URI temporal, el contexto la guarda persistente
+      }
+
+      await editProducto(producto.id, dataToUpdate);
+
+      Toast.show({
+        type: "success",
+        text1: "Producto actualizado",
+        text2: "Los cambios fueron guardados correctamente.",
+      });
+
+      navigation.goBack();
+    } catch (e) {
+      console.log("guardarCambios error:", e);
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: "No se pudieron guardar los cambios.",
+      });
+    } finally {
+      setCargando(false);
     }
   };
 
+  // ❌ Eliminar producto
+  const confirmarEliminar = async () => {
+    setModalVisible(false);
+    setCargando(true);
+
+    try {
+      await deleteProducto(producto.id);
+      showToast("Producto eliminado con éxito");
+      navigation.goBack();
+    } catch (e) {
+      console.log("Error eliminar:", e);
+      showToast("Error al eliminar");
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  // 📷 Mostrar foto (persistente o nueva)
+  const uriMostrar = nuevaFotoUri
+    ? nuevaFotoUri
+    : producto?.foto
+      ? producto.foto.startsWith(FileSystem.documentDirectory)
+        ? producto.foto
+        : FileSystem.documentDirectory + producto.foto
+      : null;
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <TextInput placeholder="Nombre" style={styles.input} value={nombre} onChangeText={setNombre} />
-      <TextInput placeholder="Código" style={styles.input} value={codigo} onChangeText={setCodigo} />
-      <TextInput placeholder="Cantidad" style={styles.input} value={cantidad} onChangeText={setCantidad} keyboardType="numeric" />
+    <View style={{ flex: 1 }}>
+      <HeaderApp />
 
-      <Text style={styles.label}>Foto del Producto:</Text>
-      <View style={styles.buttonGroup}>
-        <TouchableOpacity style={[styles.photoButton, { marginRight: 10 }]} onPress={() => handleSelectPicture(false)}>
-          <Text style={styles.buttonText}>Galería</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.photoButton} onPress={() => handleSelectPicture(true)}>
-          <Text style={styles.buttonText}>Tomar Foto</Text>
-        </TouchableOpacity>
-      </View>
+      <LinearGradient colors={["#ffffff", "#eef2ff"]} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.container}>
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => setModalVisible(true)}
+          >
+            <Text style={styles.deleteText}>🗑</Text>
+          </TouchableOpacity>
 
-      {foto && <Image source={{ uri: foto }} style={styles.imagen} />}
+          <Text style={styles.titulo}>Editar Producto</Text>
 
-      <Button 
-        title={cargando ? "Guardando..." : "Guardar Cambios"} 
-        onPress={guardarCambios} 
-        color="#007AFF" 
-        disabled={cargando}
-      />
-    </ScrollView>
+          <Text style={styles.label}>Nombre</Text>
+          <TextInput style={styles.input} value={nombre} onChangeText={setNombre} />
+
+          <Text style={styles.label}>Código</Text>
+          <TextInput style={styles.input} value={codigo} onChangeText={setCodigo} />
+
+          <Text style={styles.label}>Cantidad</Text>
+          <TextInput
+            style={styles.input}
+            value={cantidad}
+            onChangeText={setCantidad}
+            keyboardType="numeric"
+          />
+
+          <Text style={styles.label}>Stock mínimo</Text>
+          <TextInput
+            style={styles.input}
+            value={stockMinimo}
+            onChangeText={setStockMinimo}
+            keyboardType="numeric"
+          />
+
+          <Text style={styles.label}>Foto del Producto</Text>
+
+          <View style={styles.buttonGroup}>
+            <TouchableOpacity
+              style={[styles.photoButton, { marginRight: 10 }]}
+              onPress={() => pickImage(false)}
+            >
+              <Text style={styles.buttonText}>Galería</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.photoButton}
+              onPress={() => pickImage(true)}
+            >
+              <Text style={styles.buttonText}>Cámara</Text>
+            </TouchableOpacity>
+          </View>
+
+          {uriMostrar ? (
+            <Image source={{ uri: uriMostrar }} style={styles.imagen} />
+          ) : (
+            <View style={[styles.imagen, styles.imagenPlaceholder]}>
+              <Text style={{ color: "#999" }}>Sin foto</Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[styles.botonGuardar, cargando && { opacity: 0.6 }]}
+            onPress={guardarCambios}
+            disabled={cargando}
+          >
+            {cargando ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.textoGuardar}>Guardar Cambios</Text>
+            )}
+          </TouchableOpacity>
+
+          {!online && (
+            <Text style={styles.offlineMsg}>
+              Estás en modo Offline — los cambios se guardarán localmente.
+            </Text>
+          )}
+        </ScrollView>
+      </LinearGradient>
+
+      {/* Modal eliminar */}
+      <Modal transparent visible={modalVisible} animationType="fade">
+        <View style={styles.modalFondo}>
+          <View style={styles.modalCaja}>
+            <Text style={styles.modalTitulo}>¿Eliminar producto?</Text>
+            <Text style={styles.modalTexto}>
+              Esta acción no se puede deshacer.
+            </Text>
+
+            <View style={styles.modalBotones}>
+              <TouchableOpacity
+                style={styles.modalCancelar}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.modalCancelarTexto}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalEliminar}
+                onPress={confirmarEliminar}
+              >
+                <Text style={styles.modalEliminarTexto}>Eliminar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
+//
+// Estilos
+//
 const styles = StyleSheet.create({
-  container: { padding: 20, backgroundColor: '#F2F2F7', flexGrow: 1 },
-  label: { fontSize: 16, marginBottom: 8, color: '#333', fontWeight: '500' },
-  input: { 
-    backgroundColor: '#fff', 
-    borderWidth: 1, 
-    borderColor: "#D1D1D6", 
-    padding: 15, 
-    borderRadius: 10, 
-    marginBottom: 15, 
-    fontSize: 16 
+  container: { padding: 20, paddingBottom: 80 },
+
+  titulo: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#1a1a1a",
+    marginBottom: 20,
+    textAlign: "center",
   },
-  buttonGroup: { flexDirection: 'row', marginBottom: 20 },
-  photoButton: { flex: 1, backgroundColor: "#007AFF", padding: 12, borderRadius: 10, alignItems: "center" },
-  buttonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
-  imagen: { 
-    width: 150, 
-    height: 150, 
-    marginBottom: 25, 
-    alignSelf: "center", 
-    borderRadius: 10, 
-    borderWidth: 1, 
-    borderColor: '#D1D1D6' 
+
+  deleteButton: {
+    alignSelf: "flex-end",
+    padding: 8,
+    marginBottom: 10,
   },
+  deleteText: { fontSize: 26, color: "red" },
+
+  label: { fontSize: 16, marginBottom: 8, color: "#333", fontWeight: "500" },
+
+  input: {
+    backgroundColor: "#fff",
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 15,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: "#D1D1D6",
+  },
+
+  buttonGroup: { flexDirection: "row", marginBottom: 20 },
+
+  photoButton: {
+    flex: 1,
+    backgroundColor: "#4C6EF5",
+    padding: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+
+  buttonText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+
+  imagen: {
+    width: 170,
+    height: 170,
+    marginBottom: 25,
+    alignSelf: "center",
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: "#c7d2fe",
+  },
+
+  imagenPlaceholder: {
+    backgroundColor: "#f2f3f7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  botonGuardar: {
+    backgroundColor: "#34C759",
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 10,
+  },
+
+  textoGuardar: { color: "#fff", fontWeight: "700", fontSize: 17 },
+
+  offlineMsg: {
+    marginTop: 18,
+    textAlign: "center",
+    color: "#FF9500",
+    fontWeight: "600",
+  },
+
+  modalFondo: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  modalCaja: {
+    backgroundColor: "#fff",
+    width: "80%",
+    padding: 20,
+    borderRadius: 15,
+    alignItems: "center",
+  },
+
+  modalTitulo: { fontSize: 20, fontWeight: "700", marginBottom: 10 },
+
+  modalTexto: { fontSize: 15, color: "#444", textAlign: "center" },
+
+  modalBotones: {
+    flexDirection: "row",
+    marginTop: 20,
+    width: "100%",
+    justifyContent: "space-between",
+  },
+
+  modalCancelar: {
+    flex: 1,
+    backgroundColor: "#ccc",
+    padding: 12,
+    borderRadius: 10,
+    marginRight: 10,
+  },
+
+  modalCancelarTexto: { textAlign: "center", fontWeight: "600" },
+
+  modalEliminar: {
+    flex: 1,
+    backgroundColor: "red",
+    padding: 12,
+    borderRadius: 10,
+  },
+
+  modalEliminarTexto: { textAlign: "center", color: "#fff", fontWeight: "700" },
 });

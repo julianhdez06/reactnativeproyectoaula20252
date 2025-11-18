@@ -1,55 +1,51 @@
-// services/imageStorage.js
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import * as ImageManipulator from 'expo-image-manipulator';
-import { firebaseApp } from '../config/firebaseConfig'; // Asegúrate de que esta ruta es correcta
+import * as FileSystem from "expo-file-system";
+import * as ImageManipulator from "expo-image-manipulator";
 
-const storage = getStorage(firebaseApp);
-
-// 🔹 Comprime la imagen antes de subirla
-async function compressImage(uri) {
-  const result = await ImageManipulator.manipulateAsync(
-    uri,
-    [{ resize: { width: 800 } }],
-    { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
-  );
-  return result.uri;
-}
-
-// 🔹 Sube la imagen al Storage y devuelve la URL pública
-export async function uploadImage(uri, path = 'imagenes_inventario') {
+/**
+ * Guarda una imagen localmente en el almacenamiento de Expo.
+ * Devuelve la ruta final (file://...) para mostrarla más tarde.
+ */
+export async function saveLocalImage(uriOriginal, codigo) {
   try {
-    const compressedUri = await compressImage(uri);
+    if (!uriOriginal) return null;
 
-    const response = await fetch(compressedUri);
-    const blob = await response.blob();
+    // 1️⃣ Comprimir imagen
+    const result = await ImageManipulator.manipulateAsync(
+      uriOriginal,
+      [{ resize: { width: 800 } }],
+      { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+    );
 
-    const fileName = `${Date.now()}.jpg`;
-    const storageRef = ref(storage, `${path}/${fileName}`);
+    // 2️⃣ Crear nombre único basado en el código del producto
+    const fileName = `prod_${codigo}_${Date.now()}.jpg`;
+    const newPath = `${FileSystem.documentDirectory}${fileName}`;
 
-    await uploadBytes(storageRef, blob);
+    // 3️⃣ Guardar archivo comprimido en una ruta permanente
+    await FileSystem.copyAsync({
+      from: result.uri,
+      to: newPath,
+    });
 
-    const downloadURL = await getDownloadURL(storageRef);
-    return downloadURL;
+    console.log("📸 Imagen guardada en:", newPath);
 
-  } catch (error) {
-    console.error("Error subiendo imagen:", error);
-    throw error;
+    return newPath; // Ruta local final
+  } catch (e) {
+    console.log("❌ Error guardando foto:", e);
+    return null;
   }
 }
 
-// 🔹 Elimina una imagen del Storage usando su URL
-export async function deleteImage(url) {
+/**
+ * Elimina una foto del almacenamiento local
+ */
+export async function deleteLocalImage(uri) {
   try {
-    if (!url) return;
+    if (!uri) return;
 
-    const decodedUrl = decodeURIComponent(url);
-    const startIndex = decodedUrl.indexOf('/o/') + 3;
-    const endIndex = decodedUrl.indexOf('?');
-    const path = decodedUrl.substring(startIndex, endIndex);
+    await FileSystem.deleteAsync(uri, { idempotent: true });
+    console.log("🗑 Imagen eliminada:", uri);
 
-    const imgRef = ref(storage, path);
-    await deleteObject(imgRef);
-  } catch (error) {
-    console.error("Error eliminando imagen:", error);
+  } catch (e) {
+    console.log("❌ Error eliminando foto:", e);
   }
 }
